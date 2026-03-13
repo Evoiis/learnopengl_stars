@@ -43,6 +43,7 @@ int main(){
         glfwTerminate();
         return -1;
     }
+
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -57,23 +58,6 @@ int main(){
         0.5f, -0.5f, 0.0f,
         0.0f, 0.5f, 0.0f
     };
-
-    // Init Vertex Array Object
-    unsigned int VAO;
-    glGenVertexArrays(1, &VAO);    
-    glBindVertexArray(VAO);
-
-    // Generate Vertex Buffer Object
-    GLuint VBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-    // Copy vertices data into buffer's memory
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    // 4th Parameter describes how we want th GPU to manage the given data
-    // GL_STATIC_DRAW: the data will most likely not change at all or very rarely.
-    // GL_DYNAMIC_DRAW: the data is likely to change a lot.
-    // GL_STREAM_DRAW: the data will change every time it is drawn
     
 
     // Init Vertex Shader
@@ -120,15 +104,34 @@ int main(){
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if(!success) {
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+        std::cout << "ERROR::SHADER::VERTEX::LINKING_FAILED\n" << infoLog << std::endl;
     }
+
+    // Clean up
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+
+    // Init Vertex Array Object
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);    
+    glBindVertexArray(VAO);
+
+    // Generate Vertex Buffer Object
+    GLuint VBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    // Copy vertices data into buffer's memory
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // 4th Parameter describes how we want th GPU to manage the given data
+    // GL_STATIC_DRAW: the data will most likely not change at all or very rarely.
+    // GL_DYNAMIC_DRAW: the data is likely to change a lot.
+    // GL_STREAM_DRAW: the data will change every time it is drawn
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     
-    // Clean up
-    // glDeleteShader(vertexShader);
-    // glDeleteShader(fragmentShader);
 
     while (!glfwWindowShouldClose(window))
     {
