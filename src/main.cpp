@@ -57,7 +57,10 @@ int main(){
         -0.5f, 0.5f, 0.0f,
         0.5f, -0.5f, 0.0f,
         0.0f, 0.5f, 0.0f,
+    };
 
+    // GLfloat and float are interchangeable
+    float tri2_vertices[] = {
         // Triangle 2
         0.9f, 0.9f, 0.0f,
         0.0f, 0.0f, 0.0f,
@@ -149,12 +152,29 @@ int main(){
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
+
+    // Triangle 2, with separate VAO & VBO
+    unsigned int VAO_2;
+    glGenVertexArrays(1, &VAO_2);
+    glBindVertexArray(VAO_2);
+
+    uint VBO_2;
+    glGenBuffers(1, &VBO_2);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(tri2_vertices), tri2_vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+
+
     // Rectangle
-    unsigned int EBO;
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
+    // unsigned int EBO;
+    // glGenBuffers(1, &EBO);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
     
+    // Wireframe Mode
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -164,14 +184,16 @@ int main(){
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-
-        // Wireframe Mode
-        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
+        
         // Triangle
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        
+        // Triangle 2
+        glBindVertexArray(VAO_2);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO_2);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
         // Points
         // glDrawArrays(GL_POINTS, 0, 3);
         
