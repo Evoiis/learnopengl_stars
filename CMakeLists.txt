@@ -12,6 +12,10 @@ add_executable(main
     src/stb_image.cpp
 )
 
+target_compile_definitions(main PRIVATE 
+    SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders/"
+)
+
 target_include_directories(main PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
@@ -22,3 +26,4 @@ target_link_libraries(main
     glfw
     GLEW::GLEW
 )
+

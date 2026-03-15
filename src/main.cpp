@@ -112,7 +112,18 @@ int main(){
     // stbi_image_free(data);
 
     // Init Shader Program
-    Shader shader_program("./shaders/vertex_shader.vs","./shaders/fragment_shader.fs");
+    Shader shader_program(SHADER_DIR "vertex_shader.vs", SHADER_DIR "fragment_shader.fs");
+    
+    // Transformations
+    glm::vec4 vec(1.0f, 0.0f, 0.0f, 1.0f);
+    glm::mat4 trans = glm::mat4(1.0f);
+    // trans = glm::rotate(trans, glm::radians(90.0f), glm::vec3(0.0, 0.0, 1.0));
+    // trans = glm::scale(trans, glm::vec3(0.5, 0.5, 0.5));
+    
+    
+    shader_program.use();
+    unsigned int transformLoc = glGetUniformLocation(shader_program.ID, "transform");
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
 
     // Init Vertex Array Object
@@ -187,6 +198,7 @@ int main(){
     
     // Wireframe Mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    transformLoc = glGetUniformLocation(shader_program.ID, "transform");
 
     while (!glfwWindowShouldClose(window))
     {
@@ -195,8 +207,17 @@ int main(){
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // glUseProgram(shaderProgram);
+        // Transformation
+        trans = glm::mat4(1.0f);
+        // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
+        float time = (float)glfwGetTime();
+        trans = glm::translate(trans, glm::vec3(sin(time) * 0.5f, cos(time) * -0.5f, 0.0f));        
+        trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+
         shader_program.use();
+
+        // Transformation
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
         
         // Triangle
         glBindVertexArray(VAO);
