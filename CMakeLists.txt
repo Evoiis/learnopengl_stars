@@ -7,7 +7,15 @@ find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(GLEW REQUIRED)
 
-add_executable(main src/main.cpp)
+add_executable(main 
+    src/main.cpp
+    src/stb_image.cpp
+)
+
+target_include_directories(main PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/include
+)
 
 target_link_libraries(main
     OpenGL::GL
