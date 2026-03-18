@@ -9,11 +9,13 @@ find_package(GLEW REQUIRED)
 
 add_executable(main 
     src/main.cpp
+    # src/transformations.cpp
     src/stb_image.cpp
 )
 
 target_compile_definitions(main PRIVATE 
     SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders/"
+    TEXTURE_DIR="${CMAKE_SOURCE_DIR}/textures/"
 )
 
 target_include_directories(main PRIVATE
