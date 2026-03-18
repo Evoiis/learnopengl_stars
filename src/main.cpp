@@ -5,6 +5,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 // #include "stb_image.h"  // Used to load textures
 #include "shader.hpp"
@@ -16,8 +18,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void processInput(GLFWwindow *window)
 {
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         glfwSetWindowShouldClose(window, true);
+    }
 }
 
 int main(){
@@ -27,8 +30,9 @@ int main(){
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // For MACos heh
-
-    GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+    float width = 1280;
+    float height = 1024;
+    GLFWwindow* window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -128,34 +132,75 @@ int main(){
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    // Matrices
+
+    // local -> world space
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+    // world -> view space
+    glm::mat4 view = glm::mat4(1.0f);
+    // note that we're translating the scene in the reverse direction of where we want to move
+    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+
+    // Seems like we move the space around the camera, not move the camera around the space
+    // ex: Star Trek 2009 space moves around Enterprise not the other way around, helps solve beaming to an object during warp
     
-    
+    // view space -> clip space
+    glm::mat4 projection;
+    // Parameters: FOV, Aspect Ratio (w/h), near plane, far plane
+    projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+
+    glm::mat4 mvp_composite = projection * view * model;
+    int compositeLoc = glGetUniformLocation(shader_program.ID, "mvp_composite");
+    glUniformMatrix4fv(compositeLoc, 1, GL_FALSE, glm::value_ptr(mvp_composite));
+
+
     // Wireframe Mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    transformLoc = glGetUniformLocation(shader_program.ID, "transform");
-
+    // Depth On
     glEnable(GL_DEPTH_TEST);
+
+    bool pause = false;
+    bool space_was_pressed = false;
 
     while (!glfwWindowShouldClose(window))
     {
+        bool space_pressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+        if(space_pressed && !space_was_pressed){
+            pause = !pause;
+        }
+        space_was_pressed = space_pressed;
+
+        if(pause){
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            glfwPollEvents();
+            continue;
+        }
+        
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT);
+        
         // Clear depth buffer on each loop
-        glClear(GL_DEPTH_BUFFER_BIT);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         processInput(window);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
         // Transformation
         trans = glm::mat4(1.0f);
-        // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
         float time = (float)glfwGetTime();
         trans = glm::translate(trans, glm::vec3(sin(time) * 0.5f, cos(time) * -0.5f, 0.0f));        
         trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
 
         shader_program.use();
 
+        // Move Camera aka Move triangle away 
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -0.1f));
+
+        // Update MVP Composite
+        glm::mat4 mvp_composite = projection * view * model;
+        glUniformMatrix4fv(compositeLoc, 1, GL_FALSE, glm::value_ptr(mvp_composite));
         // Transformation
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
         

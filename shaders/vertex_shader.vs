@@ -3,12 +3,13 @@ layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aColor;
 
 uniform mat4 transform;
+uniform mat4 mvp_composite;
 
 out vec3 color; // output color for frag shader
 out vec2 TexCoord;
 
 void main()
 {
-    gl_Position = transform * vec4(aPos.x, aPos.y, aPos.z, 1.0);
+    gl_Position = mvp_composite * transform * vec4(aPos.x, aPos.y, aPos.z, 1.0);
     color = aColor;
 }
