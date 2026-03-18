@@ -11,6 +11,13 @@
 // #include "stb_image.h"  // Used to load textures
 #include "shader.hpp"
 
+
+struct Camera{
+    glm::vec3 pos   = glm::vec3(0.0f, 0.0f,  3.0f);
+    glm::vec3 front = glm::vec3(0.0f, 0.0f, -1.0f);
+    glm::vec3 up    = glm::vec3(0.0f, 1.0f,  0.0f);
+};
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
@@ -21,6 +28,63 @@ void processInput(GLFWwindow *window)
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         glfwSetWindowShouldClose(window, true);
     }
+
+}
+
+void processCameraInput(GLFWwindow *window, Camera& cam, float delta_time){
+    const float cameraSpeed = 2.5f * delta_time; // adjust accordingly
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+        cam.pos += cameraSpeed * cam.front;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
+        cam.pos -= cameraSpeed * cam.front;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS){
+        // std::cout << "A" << std::endl;
+        cam.pos -= glm::normalize(glm::cross(cam.front, cam.up)) * cameraSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS){
+        // std::cout << "D" << std::endl;
+        cam.pos += glm::normalize(glm::cross(cam.front, cam.up)) * cameraSpeed;
+    }
+}
+
+float lastX = 400, lastY = 300;
+float yaw = -90.0f;
+float pitch = 0.f;
+bool firstMouse = true;
+
+void processMouseInput(GLFWwindow * window, double xpos, double ypos){
+    // Ignore mouse input if button is not pressed
+    if(glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) != GLFW_PRESS){
+        firstMouse = true;
+        return;
+    }
+
+    // Prevents pop in jerk on first mouse
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed since y-coordinates range from bottom to top
+    lastX = xpos;
+    lastY = ypos;
+
+    const float sensitivity = 0.1f;
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw   += xoffset;
+    pitch += yoffset;
+    if(pitch > 89.0f){
+        pitch =  89.0f;
+    }
+    if(pitch < -89.0f){
+        pitch = -89.0f;
+    }
 }
 
 int main(){
@@ -30,8 +94,8 @@ int main(){
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // For MACos heh
-    float width = 1280;
-    float height = 1024;
+    float width = 800;
+    float height = 600;
     GLFWwindow* window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
@@ -133,23 +197,38 @@ int main(){
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    // Camera
+    const float radius = 10.0f;
+    glm::mat4 view;
+    Camera cam;
+    glm::vec3 direction;
+    
+    direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    direction.y = sin(glm::radians(pitch));
+    direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cam.front = glm::normalize(direction);
+    
+    view = glm::lookAt(cam.pos, cam.pos + cam.front, cam.up);
+
+
     // Matrices
 
     // local -> world space
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
+    // Making the view matrix in camera section
     // world -> view space
-    glm::mat4 view = glm::mat4(1.0f);
+    // glm::mat4 view = glm::mat4(1.0f);
     // note that we're translating the scene in the reverse direction of where we want to move
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+    // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
 
     // Seems like we move the space around the camera, not move the camera around the space
     // ex: Star Trek 2009 space moves around Enterprise not the other way around, helps solve beaming to an object during warp
     
     // view space -> clip space
     glm::mat4 projection;
-    // Parameters: FOV, Aspect Ratio (w/h), near plane, far plane
+    // glm::perspective Parameters: FOV, Aspect Ratio (w/h), near plane, far plane
     projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
 
     glm::mat4 mvp_composite = projection * view * model;
@@ -162,11 +241,25 @@ int main(){
     // Depth On
     glEnable(GL_DEPTH_TEST);
 
+
+    // Controls
     bool pause = false;
     bool space_was_pressed = false;
 
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Hide mouse cursor
+    glfwSetCursorPosCallback(window, processMouseInput);
+
+    // Frame time
+    float delta_time = 0.0f;
+    float last_frame_time = 0.0f;
+
     while (!glfwWindowShouldClose(window))
     {
+        float now = (float)glfwGetTime();
+        delta_time = now - last_frame_time;
+        last_frame_time = now;
+
+
         bool space_pressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
         if(space_pressed && !space_was_pressed){
             pause = !pause;
@@ -176,6 +269,7 @@ int main(){
         if(pause){
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             glfwPollEvents();
+            processInput(window);
             continue;
         }
         
@@ -186,18 +280,30 @@ int main(){
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         processInput(window);
+        processCameraInput(window, cam, delta_time);
+        view = glm::lookAt(cam.pos, cam.pos + cam.front, cam.up);
 
-        // Transformation
+        direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        direction.y = sin(glm::radians(pitch));
+        direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cam.front = glm::normalize(direction);
+        
+        // Triangle Transformation
         trans = glm::mat4(1.0f);
-        float time = (float)glfwGetTime();
-        trans = glm::translate(trans, glm::vec3(sin(time) * 0.5f, cos(time) * -0.5f, 0.0f));        
-        trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
-
+        // trans = glm::translate(trans, glm::vec3(sin(now) * 0.5f, cos(now) * -0.5f, 0.0f));        
+        // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+        
         shader_program.use();
-
+        
         // Move Camera aka Move triangle away 
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -0.1f));
+        // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -0.1f));
 
+
+        // Rotate camera around (0, 0, 0)
+        // camX = sin(glfwGetTime()) * radius;
+        // camZ = cos(glfwGetTime()) * radius;
+        // view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));  
+        
         // Update MVP Composite
         glm::mat4 mvp_composite = projection * view * model;
         glUniformMatrix4fv(compositeLoc, 1, GL_FALSE, glm::value_ptr(mvp_composite));
