@@ -33,7 +33,7 @@ void main() {
     float halo  = exp(-d * 6.0) * vBrightness * 0.4;
 
     // wide soft glow — only on bright stars
-    float bloom = exp(-d * 2.5) * vBrightness * vBrightness * 0.3;
+    float bloom = exp(-d * 4.) * vBrightness * vBrightness * 0.3;
 
     float totalBrightness = core + halo + bloom;
     float alpha = clamp(totalBrightness, 0.0, 1.0);

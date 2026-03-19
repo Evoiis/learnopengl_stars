@@ -198,7 +198,7 @@ int main(){
     // view space -> clip space
     glm::mat4 projection;
     // glm::perspective Parameters: FOV, Aspect Ratio (w/h), near plane, far plane
-    projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+    projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.05f, 100.0f);
 
     glm::mat4 mvp_composite = projection * view;
     int compositeLoc = glGetUniformLocation(shader_program.ID, "mvp_composite");

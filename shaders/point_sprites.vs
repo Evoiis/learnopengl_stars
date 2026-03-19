@@ -17,5 +17,5 @@ void main() {
 
     // lower magnitude = brighter star
     vBrightness = clamp(1.0 - (aMagnitude / 6.5), 0.0, 1.0);
-    gl_PointSize = clamp((uPointScale / pos.w) * vBrightness * vBrightness * 4, 1.0, 128.0);
+    gl_PointSize = clamp((uPointScale / pos.w) * vBrightness * vBrightness * 4, 1.0, 512.0);
 }
