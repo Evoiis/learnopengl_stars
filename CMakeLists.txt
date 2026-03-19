@@ -8,8 +8,8 @@ find_package(glfw3 REQUIRED)
 find_package(GLEW REQUIRED)
 
 add_executable(main 
-    src/main.cpp
-    # src/transformations.cpp
+    # src/main.cpp
+    src/point_sprites.cpp
     src/stb_image.cpp
 )
 
