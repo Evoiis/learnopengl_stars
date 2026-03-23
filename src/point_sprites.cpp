@@ -9,6 +9,10 @@
 #include <thread>
 #include <vector>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 // #include "stb_image.h"  // Used to load textures
 #include "shader.hpp"
 
@@ -34,7 +38,10 @@ void processInput(GLFWwindow *window)
 }
 
 void processCameraInput(GLFWwindow *window, Camera& cam, float delta_time){
-    const float cameraSpeed = 4.f * delta_time; // adjust accordingly
+    float cameraSpeed = 4.f * delta_time;
+    if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS){
+        cameraSpeed *= 4.f;
+    }
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
         cam.pos += cameraSpeed * cam.front;
     }
@@ -58,12 +65,11 @@ bool firstMouse = true;
 float pointScale;
 
 void processMouseInput(GLFWwindow * window, double xpos, double ypos){
-    // Ignore mouse input if button is not pressed
-    if(glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) != GLFW_PRESS){
+    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS){
         firstMouse = true;
         return;
     }
-
+    
     // Prevents pop in jerk on first mouse
     if (firstMouse)
     {
@@ -104,8 +110,8 @@ int main(){
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // TODO macos check
 
-    float width = 800;
-    float height = 600;
+    float width = 1280;
+    float height = 720;
 
     GLFWwindow* window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
@@ -120,6 +126,13 @@ int main(){
 
     glewExperimental = GL_TRUE;
     glewInit();
+
+    // IMGUI Init
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
     // Init Shader Program
     Shader shader_program(SHADER_DIR "point_sprites.vs", SHADER_DIR "point_sprites.fs");
@@ -216,7 +229,7 @@ int main(){
     bool pause = false;
     bool space_was_pressed = false;
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Hide mouse cursor
+    // glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Hide mouse cursor
     glfwSetCursorPosCallback(window, processMouseInput);
 
     // Frame time
@@ -242,6 +255,11 @@ int main(){
             processInput(window);
             continue;
         }
+
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
         
         
         processInput(window);
@@ -273,11 +291,23 @@ int main(){
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glDrawArrays(GL_POINTS, 0, stars.size());
 
+        ImGui::Begin("Debug");
+        ImGui::Text("Cam: %.2f %.2f %.2f", cam.pos.x, cam.pos.y, cam.pos.z);
+        ImGui::Text("Yaw: %.1f  Pitch: %.1f", yaw, pitch);
+        ImGui::Text("Stars: %zu", stars.size());
+        ImGui::End();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }  
 
     std::cout << "Terminating." << std::endl;
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
     return 0;
 }
