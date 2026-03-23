@@ -65,6 +65,9 @@ bool firstMouse = true;
 float pointScale;
 
 void processMouseInput(GLFWwindow * window, double xpos, double ypos){
+
+    if(ImGui::GetIO().WantCaptureMouse) return; // let ImGui have mouse input
+
     if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS){
         firstMouse = true;
         return;
@@ -126,6 +129,85 @@ int main(){
 
     glewExperimental = GL_TRUE;
     glewInit();
+    glClearColor(0.f, 0.f, 0.f, 1.0f);
+
+    // FBO Setup ----------------------
+    unsigned int hdrFBO, colorBuffer;
+    glGenFramebuffers(1, &hdrFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+
+    // Color texture attachment
+    glGenTextures(1, &colorBuffer);
+    glBindTexture(GL_TEXTURE_2D, colorBuffer);
+    // Allocate texture memory
+    // GL_RGBA16F allows values > 1.0 for over-bright stars
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    // Use lerp to sample the texture when scaling
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Attach the texture to the FBO
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer, 0);
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "FBO not complete" << std::endl;
+
+    // Unbind hdr
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Bright FBO Setup -------------------------------------
+    unsigned int brightFBO, brightBuffer;
+    glGenFramebuffers(1, &brightFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, brightFBO);
+
+    glGenTextures(1, &brightBuffer);
+    glBindTexture(GL_TEXTURE_2D, brightBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brightBuffer, 0);
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "Bright FBO not complete" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Setup quad for texture ----------------------------
+    float quadVerts[] = {
+        // pos         // uv
+        -1.f,  1.f,   0.f, 1.f,
+        -1.f, -1.f,   0.f, 0.f,
+        1.f, -1.f,   1.f, 0.f,
+
+        -1.f,  1.f,   0.f, 1.f,
+        1.f, -1.f,   1.f, 0.f,
+        1.f,  1.f,   1.f, 1.f,
+    };
+
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // Ping Pong FBO Setup --------------
+
+    unsigned int blurFBO[2], blurBuffer[2];
+    glGenFramebuffers(2, blurFBO);
+    glGenTextures(2, blurBuffer);
+    for(int i = 0; i < 2; i++){
+        glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[i]);
+        glBindTexture(GL_TEXTURE_2D, blurBuffer[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurBuffer[i], 0);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // IMGUI Init
     IMGUI_CHECKVERSION();
@@ -137,9 +219,36 @@ int main(){
     // Init Shader Program
     Shader shader_program(SHADER_DIR "point_sprites.vs", SHADER_DIR "point_sprites.fs");
     shader_program.use();
+    // Init Point Scale - controls star size
+    pointScale = 2.0f;
+    glUniform1f(glGetUniformLocation(shader_program.ID, "uPointScale"), height * pointScale);
+
+    // Init Bright Shader
+    Shader bright_shader(SHADER_DIR "screen.vs", SHADER_DIR "bright.fs");
+    bright_shader.use();
+
+    float threshold = 0.3f;
+    glUniform1f(glGetUniformLocation(bright_shader.ID, "threshold"), threshold);
+
+    // Init Blur Shader
+    Shader blur_shader(SHADER_DIR "screen.vs", SHADER_DIR "blur.fs");
+    float blurAmount = 10;
+
+    // Init Combine Shader
+    Shader combine_shader(SHADER_DIR "screen.vs", SHADER_DIR "combine.fs");
+    combine_shader.use();
+    // Which texture unit to sample from
+    glUniform1i(glGetUniformLocation(combine_shader.ID, "scene"), 0);
+    glUniform1i(glGetUniformLocation(combine_shader.ID, "bloomBlur"), 1);
+
+    float bloomStrength = 1.0f;
+    glUniform1f(glGetUniformLocation(combine_shader.ID, "bloomStrength"), bloomStrength);
+
+    
 
     // Init Stars
     std::vector<StarVertex> stars = {
+        // position, magnitude, color
         {{ 0.0f,  1.0f,  -5.0f}, -1.46f, 0.5f}, // Sirius-like,  blue-white
         {{ 1.5f,  0.5f,  -8.0f},  0.45f, 0.71f}, // Vega-like,    white
         {{ 0.5f,  0.5f,  -6.f},   2.5f, 3.5f}, // sun-like,     yellow-white
@@ -176,19 +285,15 @@ int main(){
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(StarVertex), (void*)offsetof(StarVertex, position));
     glEnableVertexAttribArray(0);
 
-    glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(StarVertex), (void*)offsetof(StarVertex, magnitude));
+    glEnableVertexAttribArray(1);
 
-    glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(StarVertex), (void*)offsetof(StarVertex, color));
+    glEnableVertexAttribArray(2);
 
-    // Init Point Scale - controls star size
-    pointScale = 2.0f;
-    glUniform1f(glGetUniformLocation(shader_program.ID, "uPointScale"), height * pointScale);
 
 
     // Camera (view matrix)
-    const float radius = 10.0f;
     glm::mat4 view;
     Camera cam;
     glm::vec3 direction;
@@ -220,21 +325,25 @@ int main(){
     // Depth On
     // glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
-    glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive — stars glow through each other
     glDepthMask(GL_FALSE); // Prevent z-fighting at the far end of the scene
+
 
 
     // Controls
     bool pause = false;
     bool space_was_pressed = false;
 
+    
     // glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Hide mouse cursor
-    glfwSetCursorPosCallback(window, processMouseInput);
+    // glfwSetCursorPosCallback(window, processMouseInput);
 
     // Frame time
     float delta_time = 0.0f;
     float last_frame_time = 0.0f;
+
+    // Mouse positions
+    double mouse_xpos, mouse_ypos;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -256,6 +365,9 @@ int main(){
             continue;
         }
 
+        glfwGetCursorPos(window, &mouse_xpos, &mouse_ypos);
+        processMouseInput(window, mouse_xpos, mouse_ypos);
+
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -271,34 +383,93 @@ int main(){
         
         processCameraInput(window, cam, delta_time);
         view = glm::lookAt(cam.pos, cam.pos + cam.front, cam.up);
-        glClearColor(0.f, 0.f, 0.f, 1.0f);
-                
-        // Clear depth and color buffer on each loop
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-        
         
         shader_program.use();
-        
-        
+
+        // Bind FBO and clear buffers
+        glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Update MVP Composite
         glm::mat4 mvp_composite = projection * view;
         glUniformMatrix4fv(compositeLoc, 1, GL_FALSE, glm::value_ptr(mvp_composite));
-        
-        // Triangle
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glDrawArrays(GL_POINTS, 0, stars.size());
 
+        // Draw Stars
+        glEnable(GL_BLEND);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_POINTS, 0, stars.size());
+        glDisable(GL_BLEND);
+
+        // Bright Shader Pass
+        glBindFramebuffer(GL_FRAMEBUFFER, brightFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        bright_shader.use();
+        glBindVertexArray(quadVAO);
+        glUniform1i(glGetUniformLocation(bright_shader.ID, "screenTexture"), 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffer);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Blur Pass
+        bool horizontal = true;
+        blur_shader.use();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[0]);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[1]);
+        glClear(GL_COLOR_BUFFER_BIT);
+        
+        // First iteration reads from brightBuffer, every subsequent iteration ping-pongs between the two blur FBOs.
+        // After 10 passes the result is in blurBuffer[!horizontal].
+        for(int i = 0; i < (int)blurAmount; i++){
+            glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[horizontal]);
+            glUniform1i(glGetUniformLocation(blur_shader.ID, "horizontal"), horizontal);
+            glBindTexture(GL_TEXTURE_2D, i == 0 ? brightBuffer : blurBuffer[!horizontal]);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            horizontal = !horizontal;
+        }
+
+        // Back to FBO 0 (Screen)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Combine Pass
+        combine_shader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffer);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, blurBuffer[!horizontal]);
+
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Imgui Draw Gui
+        ImGui::SetNextWindowSize(ImVec2(300, 200));
         ImGui::Begin("Debug");
         ImGui::Text("Cam: %.2f %.2f %.2f", cam.pos.x, cam.pos.y, cam.pos.z);
         ImGui::Text("Yaw: %.1f  Pitch: %.1f", yaw, pitch);
         ImGui::Text("Stars: %zu", stars.size());
+        ImGui::Text("WantMouse: %d", ImGui::GetIO().WantCaptureMouse);
+        
+
+        ImGui::SliderFloat("Blur Amount", &blurAmount, 1.0f, 100.0f);
+        ImGui::Text("BlurAmount: %d", (int)blurAmount);
+
+        ImGui::SliderFloat("Threshold", &threshold, 0.0f, 1.0f);
+        bright_shader.use();
+        glUniform1f(glGetUniformLocation(bright_shader.ID, "threshold"), threshold);
+
+        ImGui::SliderFloat("Bloom Strength", &bloomStrength, 0.0f, 3.0f);
+        combine_shader.use();
+        glUniform1f(glGetUniformLocation(combine_shader.ID, "bloomStrength"), bloomStrength);
         ImGui::End();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        
 
         glfwSwapBuffers(window);
         glfwPollEvents();

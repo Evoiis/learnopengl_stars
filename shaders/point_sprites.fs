@@ -30,10 +30,10 @@ void main() {
     float core  = exp(-d * 20.0) * vBrightness;
 
     // medium halo
-    float halo  = exp(-d * 6.0) * vBrightness * 0.4;
+    float halo  = exp(-d * 6.0) * vBrightness * .4;
 
     // wide soft glow — only on bright stars
-    float bloom = exp(-d * 4.) * vBrightness * vBrightness * 0.3;
+    float bloom = exp(-d * 2.) * vBrightness * vBrightness * 0.1;
 
     float totalBrightness = core + halo + bloom;
     float alpha = clamp(totalBrightness, 0.0, 1.0);
