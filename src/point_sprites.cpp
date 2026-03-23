@@ -244,7 +244,6 @@ int main(){
     float bloomStrength = 1.0f;
     glUniform1f(glGetUniformLocation(combine_shader.ID, "bloomStrength"), bloomStrength);
 
-    
 
     // Init Stars
     std::vector<StarVertex> stars = {
@@ -327,8 +326,6 @@ int main(){
     glEnable(GL_PROGRAM_POINT_SIZE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive — stars glow through each other
     glDepthMask(GL_FALSE); // Prevent z-fighting at the far end of the scene
-
-
 
     // Controls
     bool pause = false;
@@ -415,6 +412,7 @@ int main(){
         bool horizontal = true;
         blur_shader.use();
 
+        glUniform1i(glGetUniformLocation(blur_shader.ID, "image"), 0);
         glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[0]);
         glClear(GL_COLOR_BUFFER_BIT);
         glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[1]);
@@ -431,7 +429,7 @@ int main(){
             horizontal = !horizontal;
         }
 
-        // Back to FBO 0 (Screen)
+        // Back to FBO 0 (Screen) to draw the result with combine pass
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
