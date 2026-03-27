@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/norm.hpp>
 
 #include <iostream>
 #include <chrono>
@@ -19,8 +20,8 @@
 
 struct Camera{
     glm::vec3 pos   = glm::vec3(0.0f, 0.0f,  3.0f);
-    glm::vec3 front = glm::vec3(0.0f, 0.0f, -1.0f);
-    glm::vec3 up    = glm::vec3(0.0f, 1.0f,  0.0f);
+    glm::vec3 front = glm::vec3(0.0f, 0.0f, -1.0f); // direction camera is pointing
+    glm::vec3 up    = glm::vec3(0.0f, 1.0f,  0.0f); // which way is up for the camera, can edit to roll the camera
 };
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -99,11 +100,48 @@ void processMouseInput(GLFWwindow * window, double xpos, double ypos){
     }
 }
 
+
 struct StarVertex {
     glm::vec3 position;
     float magnitude;
     float color;
 };
+
+struct StarMeta {
+    std::string name;
+};
+
+// Star Label Params
+float far_clip = 40.f;  // tweak if necessary
+float near_clip = 1.f;
+
+bool calculate_label_position(glm::mat4 mvp, glm::vec3 cam_pos, StarVertex star, float width, float height, ImVec2 & result){
+    if(glm::length2(cam_pos - star.position) > far_clip * far_clip){
+        return false;
+    }
+
+    // Transform star position to clip space
+    auto clip_space_pos = mvp * glm::vec4(star.position, 1.);
+    
+    // Check if star is behind the camera
+    if(clip_space_pos.w <= 0){
+        return false;
+    }
+    
+    // Translate to normalized device coordinates
+    glm::vec3 ndc = glm::vec3(clip_space_pos) / clip_space_pos.w;
+
+    // Check if outside of FOV
+    if(ndc.x > 1 || ndc.x < -1 || ndc.y > 1 || ndc.y < -1){
+        return false;
+    }
+
+    
+    result.x = (ndc.x + 1) / 2 * width;
+    result.y = (1 - ndc.y) / 2 * height;    // Y is flipped in Imgui so (1 - y)
+
+    return true;
+}
 
 int main(){
     glfwInit();
@@ -244,6 +282,24 @@ int main(){
     float bloomStrength = 1.0f;
     glUniform1f(glGetUniformLocation(combine_shader.ID, "bloomStrength"), bloomStrength);
 
+    // Must match stars in stars data below
+    std::vector<StarMeta> star_meta_data = {
+        {"Sirius"},
+        {"Vega"},
+        {"Sol"},
+        {"Ran"},
+        {"Proxima Centauri"},
+        {"Altair"},
+        {"Fomalhaut"},
+        {"Pollux"},
+        {"Arcturus"},
+        {"Betelgeuse"},
+        {"Rigel"},
+        {"Deneb"},
+        {"Spica"},
+        {"Antares"},
+        {"Aldebaran"},
+    };
 
     // Init Stars
     std::vector<StarVertex> stars = {
@@ -365,11 +421,9 @@ int main(){
         glfwGetCursorPos(window, &mouse_xpos, &mouse_ypos);
         processMouseInput(window, mouse_xpos, mouse_ypos);
 
-
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        
+        ImGui::NewFrame();        
         
         processInput(window);
         
@@ -451,8 +505,8 @@ int main(){
         ImGui::Text("Yaw: %.1f  Pitch: %.1f", yaw, pitch);
         ImGui::Text("Stars: %zu", stars.size());
         ImGui::Text("WantMouse: %d", ImGui::GetIO().WantCaptureMouse);
-        
 
+        // Update Blur Parameters
         ImGui::SliderFloat("Blur Amount", &blurAmount, 1.0f, 100.0f);
         ImGui::Text("BlurAmount: %d", (int)blurAmount);
 
@@ -463,6 +517,23 @@ int main(){
         ImGui::SliderFloat("Bloom Strength", &bloomStrength, 0.0f, 3.0f);
         combine_shader.use();
         glUniform1f(glGetUniformLocation(combine_shader.ID, "bloomStrength"), bloomStrength);
+
+        // Draw Star Labels
+        // GetBackgroundDrawLists, Draws behind GUI, but in front of scene        
+        ImVec2 label_position;
+        bool should_draw;
+        for(int i = 0; i < stars.size(); i++){
+            should_draw = calculate_label_position(mvp_composite, cam.pos, stars[i], width, height, label_position);
+            if(should_draw){
+                ImGui::GetBackgroundDrawList()->AddText(
+                    label_position,
+                    IM_COL32(255, 255, 255, 255),
+                    star_meta_data[i].name.c_str()
+                );
+            }
+        }        
+        
+
         ImGui::End();
 
         ImGui::Render();
