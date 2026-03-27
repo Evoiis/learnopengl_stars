@@ -112,8 +112,8 @@ struct StarMeta {
 };
 
 // Star Label Params
-float far_clip = 40.f;  // tweak if necessary
-float near_clip = 1.f;
+float far_clip = 100.f;  // tweak if necessary, maybe tweak with star magnitude in the future?
+// float near_clip = 1.f;
 
 bool calculate_label_position(glm::mat4 mvp, glm::vec3 cam_pos, StarVertex star, float width, float height, ImVec2 & result){
     if(glm::length2(cam_pos - star.position) > far_clip * far_clip){
@@ -363,6 +363,7 @@ int main(){
 
     // MVP Composite
 
+    // don't need this because my star positions are already in world space
     // local -> world space
     // glm::mat4 model = glm::mat4(1.0f);
     // model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -531,14 +532,11 @@ int main(){
                     star_meta_data[i].name.c_str()
                 );
             }
-        }        
-        
+        }
 
         ImGui::End();
-
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        
 
         glfwSwapBuffers(window);
         glfwPollEvents();
