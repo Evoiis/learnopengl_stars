@@ -1,5 +1,7 @@
 # learnOpengl
 
+Repo to learn and practice opengl and prototype visualization for Milky Way Maps
+
 ### Dependencies
 
 ```
