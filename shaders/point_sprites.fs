@@ -33,10 +33,13 @@ void main() {
     float halo  = exp(-d * 6.0) * vBrightness * .4;
 
     // wide soft glow — only on bright stars
-    float bloom = exp(-d * 2.) * vBrightness * vBrightness * 0.1;
+    float glow = exp(-d * 2.) * vBrightness * vBrightness * 0.1;
 
-    float totalBrightness = core + halo + bloom;
+    float totalBrightness = core + halo + glow;
+    // float totalBrightness = core * 50.; // Can grow size & brightness with multiplication
     float alpha = clamp(totalBrightness, 0.0, 1.0);
 
     fragColor = vec4(color * totalBrightness, alpha);
 }
+
+    // float totalBrightness = core * 20.;

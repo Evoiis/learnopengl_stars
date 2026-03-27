@@ -151,7 +151,7 @@ int main(){
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // TODO macos check
 
-    float width = 1280;
+    float width = 1280; // Parameter?
     float height = 720;
 
     GLFWwindow* window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
@@ -183,6 +183,9 @@ int main(){
     // Use lerp to sample the texture when scaling
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Clamp edges
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     // Attach the texture to the FBO
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer, 0);
 
@@ -202,6 +205,9 @@ int main(){
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Clamp edges
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brightBuffer, 0);
 
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -243,6 +249,9 @@ int main(){
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // Clamp edges
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurBuffer[i], 0);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -258,19 +267,19 @@ int main(){
     Shader shader_program(SHADER_DIR "point_sprites.vs", SHADER_DIR "point_sprites.fs");
     shader_program.use();
     // Init Point Scale - controls star size
-    pointScale = 2.0f;
+    pointScale = 2.0f;  // Parameter
     glUniform1f(glGetUniformLocation(shader_program.ID, "uPointScale"), height * pointScale);
 
     // Init Bright Shader
-    Shader bright_shader(SHADER_DIR "screen.vs", SHADER_DIR "bright.fs");
-    bright_shader.use();
+    Shader brightness_shader(SHADER_DIR "screen.vs", SHADER_DIR "bright.fs");
+    brightness_shader.use();
 
-    float threshold = 0.3f;
-    glUniform1f(glGetUniformLocation(bright_shader.ID, "threshold"), threshold);
+    float threshold = 0.3f; // Parameter or controlled by star data
+    glUniform1f(glGetUniformLocation(brightness_shader.ID, "threshold"), threshold);
 
     // Init Blur Shader
     Shader blur_shader(SHADER_DIR "screen.vs", SHADER_DIR "blur.fs");
-    float blurAmount = 10;
+    float blurAmount = 10;  // Parameter
 
     // Init Combine Shader
     Shader combine_shader(SHADER_DIR "screen.vs", SHADER_DIR "combine.fs");
@@ -279,7 +288,7 @@ int main(){
     glUniform1i(glGetUniformLocation(combine_shader.ID, "scene"), 0);
     glUniform1i(glGetUniformLocation(combine_shader.ID, "bloomBlur"), 1);
 
-    float bloomStrength = 1.0f;
+    float bloomStrength = 1.0f; // Parameter or controlled by star data
     glUniform1f(glGetUniformLocation(combine_shader.ID, "bloomStrength"), bloomStrength);
 
     // Must match stars in stars data below
@@ -372,6 +381,7 @@ int main(){
     // view space -> clip space
     glm::mat4 projection;
     // glm::perspective Parameters: FOV, Aspect Ratio (w/h), near plane, far plane
+    // Parameter: near and far plane values
     projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.05f, 100.0f);
 
     glm::mat4 mvp_composite = projection * view;
@@ -452,13 +462,13 @@ int main(){
         glDrawArrays(GL_POINTS, 0, stars.size());
         glDisable(GL_BLEND);
 
-        // Bright Shader Pass
+        // Brightness Shader Pass
         glBindFramebuffer(GL_FRAMEBUFFER, brightFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        bright_shader.use();
+        brightness_shader.use();
         glBindVertexArray(quadVAO);
-        glUniform1i(glGetUniformLocation(bright_shader.ID, "screenTexture"), 0);
+        glUniform1i(glGetUniformLocation(brightness_shader.ID, "screenTexture"), 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, colorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -512,8 +522,8 @@ int main(){
         ImGui::Text("BlurAmount: %d", (int)blurAmount);
 
         ImGui::SliderFloat("Threshold", &threshold, 0.0f, 1.0f);
-        bright_shader.use();
-        glUniform1f(glGetUniformLocation(bright_shader.ID, "threshold"), threshold);
+        brightness_shader.use();
+        glUniform1f(glGetUniformLocation(brightness_shader.ID, "threshold"), threshold);
 
         ImGui::SliderFloat("Bloom Strength", &bloomStrength, 0.0f, 3.0f);
         combine_shader.use();
